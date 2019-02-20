@@ -18,6 +18,5 @@ RUN npm test -s
 # [3] From the base, copy generated files and prune to production dependancies
 FROM builder as prod
 ENV NODE_ENV production
-EXPOSE 3000
 RUN npm prune
 ENTRYPOINT ["npm", "start", "-s", "--"]
