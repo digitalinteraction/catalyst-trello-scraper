@@ -12,7 +12,7 @@
     "build": "tsc",
     "lint": "npx tsc --noEmit",
     "coverage": "jest --coverage",
-    "preversion": "npm test -s && npm run build && git add dist",
+    "preversion": "npm run lint && npm test -s",
     "prettier": "prettier --write '**/*.{js,ts,tsx,json,css,md}'",
     "start": "node -r dotenv/config dist/cli.js",
     "test": "jest",
