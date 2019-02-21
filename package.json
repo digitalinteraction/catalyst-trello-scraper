@@ -28,6 +28,7 @@
     "chalk": "^2.4.2",
     "commander": "^2.19.0",
     "dotenv": "^6.2.0",
+    "format-ms": "^1.2.1",
     "node-cron": "^2.0.3",
     "redis": "^2.8.0",
     "valid-env": "^0.1.3"

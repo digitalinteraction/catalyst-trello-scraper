@@ -2,6 +2,7 @@ import validateEnv from 'valid-env'
 import program from 'commander'
 import chalk from 'chalk'
 import cron from 'node-cron'
+import { formatMilliseconds } from 'format-ms'
 
 import { TrelloClient } from './TrelloClient'
 import { AsyncRedisClient } from './AsyncRedisClient'
@@ -46,6 +47,7 @@ program
   .command('fetch')
   .description('Fetch the current projects and store them in redis')
   .option('--dry-run', 'Only output projects', false)
+  .option('--verbose', 'Output additional info', false)
   .action(fetch)
 
 program
@@ -56,6 +58,7 @@ program
     'The timezone to schedule in [Europe/London]',
     'Europe/London'
   )
+  .option('--verbose', 'Output additional info', false)
   .action(schedule)
 
 program
@@ -85,9 +88,10 @@ program.parse(process.argv)
 //
 
 /** Fetch projects and store them in redis */
-async function fetch(cmd: program.Command, exitAfter = true) {
+async function fetch(cmd: program.Command) {
   try {
-    let projects = await trello.fetchProjects(boardId, listId)
+    let startTime = Date.now()
+    const projects = await trello.fetchProjects(boardId, listId)
 
     if (cmd.dryRun) {
       outputProjects(projects)
@@ -96,12 +100,12 @@ async function fetch(cmd: program.Command, exitAfter = true) {
       await redis.set('projects', pack(projects))
     }
 
-    console.log(greenCheck, `Fetched projects`)
+    if (cmd.verbose) logFetch(startTime, projects)
 
-    if (exitAfter) await redis.close()
+    await redis.close()
   } catch (error) {
-    console.log(redCross, `Fetch failed: ${error.message}`)
-    if (exitAfter) process.exit(1)
+    console.log(redCross, 'Fetch failed:', error.message)
+    process.exit(1)
   }
 }
 
@@ -120,7 +124,22 @@ async function schedule(schedule: string, cmd: program.Command) {
 
   console.log(`Scheduled for '${schedule}' in ${timezone}`)
   console.log('see:', url)
-  cron.schedule(schedule, () => fetch(cmd, false), { timezone })
+  cron.schedule(
+    schedule,
+    async () => {
+      try {
+        let startTime = Date.now()
+        const projects = await trello.fetchProjects(boardId, listId)
+
+        if (cmd.verbose) logFetch(startTime, projects)
+
+        await redis.set('projects', pack(projects))
+      } catch (error) {
+        console.log(redCross, 'Fetch failed:', error.message)
+      }
+    },
+    { timezone }
+  )
 }
 
 /** List projects stored in redis */
@@ -135,6 +154,14 @@ async function listProjects(cmd: program.Command) {
     console.log(redCross, `List failed: ${error.message}`)
     process.exit(1)
   }
+}
+
+function logFetch(startTime: number, projects: Project[]) {
+  console.log(
+    new Date().toISOString(),
+    `(${formatMilliseconds(Date.now() - startTime)})`,
+    `Fetched ${projects.length} projects`
+  )
 }
 
 /** Output projects in a structured way */
