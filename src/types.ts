@@ -21,6 +21,7 @@ export type TrelloCard = {
   name: string
   idList: string
   desc: string
+  dateLastActivity: string
   descData: { emoji: { [idx: string]: string } }
   idLabels: string[]
 }
@@ -33,6 +34,7 @@ export type TrelloLabel = {
 }
 
 export type Project = TrelloCard & {
+  dateCreated: Date
   needs: TagRelation[]
   themes: TagRelation[]
   category: TagRelation | null

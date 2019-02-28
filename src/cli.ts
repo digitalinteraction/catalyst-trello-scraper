@@ -6,7 +6,7 @@ import { formatMilliseconds } from 'format-ms'
 
 import { TrelloClient } from './TrelloClient'
 import { AsyncRedisClient } from './AsyncRedisClient'
-import { redCross, greenCheck } from './consts'
+import { redCross } from './consts'
 import { Project, StringObject } from './types'
 
 // Ensure required variables are set or exit(1)

@@ -5,6 +5,11 @@ export type LabelRelationMap = {
   [idx: string]: TagRelation | undefined
 }
 
+export function extractDate(id: string): Date {
+  let hexTimestamp = id.substring(0, 8)
+  return new Date(parseInt(hexTimestamp, 16) * 1000)
+}
+
 /** A client to read cards from trello transform them into catalyst projects */
 export class TrelloClient {
   client = axios.create({
@@ -22,7 +27,7 @@ export class TrelloClient {
           fields: 'name',
           labels: 'all',
           cards: 'open',
-          card_fields: 'id,name,idList,desc,descData,idLabels'
+          card_fields: 'id,name,idList,desc,descData,idLabels,dateLastActivity'
         }
       })
       return data
@@ -60,6 +65,7 @@ export class TrelloClient {
     for (let card of publicCards) {
       projects.push({
         ...card,
+        dateCreated: extractDate(card.id),
         needs: mapLabels(card.idLabels, 'needs'),
         themes: mapLabels(card.idLabels, 'theme'),
         category: mapLabels(card.idLabels, 'category')[0] || null
