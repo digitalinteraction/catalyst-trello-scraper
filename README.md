@@ -150,10 +150,10 @@ and also ignores files using [.prettierignore](/.prettierignore).
 
 This repo uses a [GitLab CI](https://about.gitlab.com/product/continuous-integration/)
 to build a Docker image when you push a git tag.
-This is designed to be used with the `npm version` command so all docker images are semantically versioned.
-We don't use the `:latest` docker tag.
+This is designed to be used with the `npm version` command so all docker images are [semantically versioned](https://semver.org/).
+The `:latest` docker tag is not used.
 
-This job builds runs using the [.gitlab-ci.yml](/.gitlab-ci.yml) file which
+This job runs using the [.gitlab-ci.yml](/.gitlab-ci.yml) file which
 runs a docker build using the [Dockerfile](/Dockerfile)
 and **only** runs when you push a [tag](https://git-scm.com/book/en/v2/Git-Basics-Tagging).
 
