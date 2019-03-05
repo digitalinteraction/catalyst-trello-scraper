@@ -17,7 +17,9 @@
     "start": "node -r dotenv/config dist/cli.js",
     "test": "jest",
     "dev": "NODE_ENV=development ts-node -r dotenv/config src/cli.ts",
-    "redis": "docker run -it --rm --name dev_redis -p 6379:6379 redis:4-alpine"
+    "redis": "docker run -it --rm --name dev_redis -p 6379:6379 redis:4-alpine",
+    "redis-cli": "docker exec -it dev_redis redis-cli",
+    "gen-readme-toc": "npx @robb_j/md-toc -i"
   },
   "keywords": [
     "not-equal-catalyst",

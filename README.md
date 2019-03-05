@@ -7,15 +7,13 @@ and deployed through [Docker](https://www.docker.com/).
 It queries the Trello API for cards on a specific list,
 parses relationships from card labels, then writes into [redis](https://redis.io/).
 
-A key part of this is that it uses Docker's `ENTRYPOINT` so that you can run the CLI through Docker.
-
 [What is Not-Equal Catalyst?](https://github.com/unplatform/catalyst-about)
 
 <!-- toc-head -->
 
 ## Table of Contents
 
-- [CLI Usage](#cli-usage)
+- [Why a CLI](#why-a-cli)
 - [Development](#development)
   - [Setup](#setup)
   - [Regular use](#regular-use)
@@ -28,20 +26,25 @@ A key part of this is that it uses Docker's `ENTRYPOINT` so that you can run the
 
 <!-- toc-tail -->
 
-## CLI Usage
+## Why a CLI
 
-This CLI is designed to be used with Docker.
+This is a CLI that is designed to be run with Docker and docker-compose.
 This means you can set environment variables and link in a redis container.
+
+It uses Docker's `ENTRYPOINT` so that you can pass your CLI command via docker.
+This means you can deploy and run through `docker-compose` and customise the command
+at the deployment level, not at the application level.
 
 ## Development
 
 ### Setup
 
-To develop on this repo you will need to have [Docker](https://www.docker.com/)
-and [node.js](https://nodejs.org) installed on your dev machine.
+To develop on this repo you will need to have [Docker](https://www.docker.com/) and
+[node.js](https://nodejs.org) installed on your dev machine and have an understanding of them.
 This guide assumes you are on macOS, but equivalent commands are available.
+You will also need a Trello account which is used to pull the data from.
 
-You will also need a Trello account which is used to pull from.
+You'll only need to follow this setup once for you dev machine.
 
 ```bash
 # Install dependancies
@@ -57,32 +60,35 @@ open https://trello.com/app-key
 . .env
 open "https://trello.com/1/authorize?expiration=never&scope=read&response_type=token&name=Husky%20CMS&key=$TRELLO_APP_KEY"
 
-# To get your TRELLO_BOARD_ID & TRELLO_LIST_ID, visit the board on the trello.com.
+# To get your TRELLO_BOARD_ID & TRELLO_LIST_ID, visit the board you want to pull from on the trello.com
 # Then add .json to the end of the url and inspect the contents to find your values
 open https://trello.com
 ```
 
 ### Regular use
 
+These are the commands you'll regularly run to develop the CLI, in no particular order.
+
 ```bash
 # Spin up a local redis instance for development
-# -> Launches a redis:4-alpine docker container
+# -> Launches a redis:4-alpine docker container (you'll need docker running)
 # -> Binds port 6379 to localhost:6379
-# -> Calls the container dev_redis
+# -> Names the container dev_redis
 npm run redis
 
 # Run the CLI in development mode
 # -> Runs the TypeScript directly with `ts-node` and loads the .env
-# -> Use the `--` to stop npm swallowing the dash-dash commands
+# -> Use the `--` to stop npm swallowing the dash-dash arguments
 npm run dev -- --help
 
 # Execute redis commands to inspect the store
 # -> Runs a command in the redis container (started by `npm run redis`)
 # -> Attaches std in/output so it behaves like you've ssh'd into it
 # -> Runs the internal redis-cli, so you can directly talk to redis
-docker exec -it dev_redis redis-cli
+# -> For reference: https://redis.io/commands
+npm run redis-cli
 
-# Example redis commands
+# Useful redis commands
 127.0.0.1:6379> keys *       # List all keys
 127.0.0.1:6379> get projects # Get projects
 
@@ -91,11 +97,12 @@ docker exec -it dev_redis redis-cli
 npm run test
 
 # Generate the table of contents for this readme
-npx @robb_j/md-toc -i
-
+npm run gen-readme-toc
 ```
 
 ### Irregular use
+
+These are commands you might need to run but probably won't, also in no particular order.
 
 ```bash
 # Manually lint code with TypeScript's `tsc`
@@ -127,18 +134,20 @@ npm run start
 
 This repo uses [Prettier](https://prettier.io/) to automatically format code to a consistent standard.
 This works using the [husky](https://www.npmjs.com/package/husky)
-and [lint-staged](https://www.npmjs.com/package/lint-staged) modules to
+and [lint-staged](https://www.npmjs.com/package/lint-staged) packages to
 automatically format code whenever you commit code.
-
 This means that code that is pushed to the repo is always formatted to a consistent standard.
+
 You can manually run the formatter with `npm run prettier` if you want.
-Prettier is slightly configured in [.prettier.yml](/.prettier.yml).
+
+Prettier is slightly configured in [.prettierrc.yml](/.prettierrc.yml)
+and also ignores files using [.prettierignore](/.prettierignore).
 
 ## Deployment
 
 ### Building the image
 
-This project uses a [GitLab CI](https://about.gitlab.com/product/continuous-integration/)
+This repo uses a [GitLab CI](https://about.gitlab.com/product/continuous-integration/)
 to build a Docker image when you push a git tag.
 This is designed to be used with the `npm version` command so all docker images are semantically versioned.
 We don't use the `:latest` docker tag.
@@ -147,14 +156,14 @@ This job builds runs using the [.gitlab-ci.yml](/.gitlab-ci.yml) file which
 runs a docker build using the [Dockerfile](/Dockerfile)
 and **only** runs when you push a [tag](https://git-scm.com/book/en/v2/Git-Basics-Tagging).
 
-It pushes this docker images to the [GitLab registry](https://openlab.ncl.ac.uk/gitlab/catalyst/trello-scraper/container_registry).
-
-A slight nuance is that it will replace a preceding `v` to format `v1.0.0` to `1.0.0`.
+It pushes these docker images to the [GitLab registry](https://openlab.ncl.ac.uk/gitlab/catalyst/trello-scraper/container_registry).
+A slight nuance is that it will replace a preceding `v` in tag names, formatting `v1.0.0` to `1.0.0`.
 
 ```bash
 # Deploy a new version of the CLI
 npm version # major | minor | patch
 git push --tags
+open https://openlab.ncl.ac.uk/gitlab/catalyst/trello-scraper/-/jobs
 ```
 
 ### Using the image
@@ -164,9 +173,11 @@ You'll need to set your environment variables, similar to [Regular use](#regular
 
 Here is an example `docker-compose.yml`:
 
-> You pass the same commands as `npm run dev` to the `command` attribute
-
-> You can set non-secret environment variables with the `environment` option.
+> Notes:
+>
+> - You pass the same commands as `npm run dev` to the `command` attribute
+> - You can set non-secret environment variables with the `environment` option.
+> - Don't actually run this docker-compose.yml, it's an example
 
 ```yml
 version: '3'
