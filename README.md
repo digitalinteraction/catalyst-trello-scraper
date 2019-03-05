@@ -95,9 +95,6 @@ npm run redis-cli
 # Run unit tests
 # -> Looks for files named `*.spec.ts` in the src directory
 npm run test
-
-# Generate the table of contents for this readme
-npm run gen-readme-toc
 ```
 
 ### Irregular use
@@ -105,6 +102,10 @@ npm run gen-readme-toc
 These are commands you might need to run but probably won't, also in no particular order.
 
 ```bash
+# Generate the table of contents for this readme
+# -> It'll replace content between the toc-head and toc-tail HTML comments
+npm run gen-readme-toc
+
 # Manually lint code with TypeScript's `tsc`
 npm run lint
 
