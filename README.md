@@ -41,7 +41,7 @@ at the deployment level, not at the application level.
 
 To develop on this repo you will need to have [Docker](https://www.docker.com/) and
 [node.js](https://nodejs.org) installed on your dev machine and have an understanding of them.
-This guide assumes you are on macOS, but equivalent commands are available.
+This guide assumes you have the repo checked out and are on macOS, but equivalent commands are available.
 You will also need a Trello account which is used to pull the data from.
 
 You'll only need to follow this setup once for your dev machine.
@@ -196,6 +196,7 @@ Here is an example `docker-compose.yml`:
 > - You pass the same commands as `npm run dev` to the `command` attribute
 > - You can set non-secret environment variables with the `environment` option.
 > - Don't actually run this docker-compose.yml, it's an example
+> - For more info see [catalyst-example-stack](https://github/com/unplatform/catalyst-example-stack)
 
 ```yml
 version: '3'
