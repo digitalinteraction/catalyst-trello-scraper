@@ -44,7 +44,7 @@ To develop on this repo you will need to have [Docker](https://www.docker.com/) 
 This guide assumes you are on macOS, but equivalent commands are available.
 You will also need a Trello account which is used to pull the data from.
 
-You'll only need to follow this setup once for you dev machine.
+You'll only need to follow this setup once for your dev machine.
 
 ```bash
 # Install dependancies
@@ -128,7 +128,7 @@ npm run start
 | Folder       | Contents                                     |
 | ------------ | -------------------------------------------- |
 | dist         | Where the transpilled JavaScript is built to |
-| node_modules | Where npm's modules get installed to         |
+| node_modules | Where npm's modules get installed into       |
 | src          | Where the code of the app is                 |
 
 ### Code formatting
@@ -143,6 +143,23 @@ You can manually run the formatter with `npm run prettier` if you want.
 
 Prettier is slightly configured in [.prettierrc.yml](/.prettierrc.yml)
 and also ignores files using [.prettierignore](/.prettierignore).
+
+### Testing
+
+> This CLI is currently quite simple and doesn't have any unit tests yet
+
+This repo uses [unit tests](https://en.wikipedia.org/wiki/Unit_testing) to ensure that everything is working correctly, guide development, avoid bad code and reduce defects.
+The [Jest](https://www.npmjs.com/package/jest) package is used to run unit tests.
+Tests are any file in `src/` that ends with `.spec.ts`, by convention they are inline with the source code,
+in a parallel folder called `__tests__`.
+
+```bash
+# Run the tests
+npm test -s
+
+# Generate code coverage
+npm run coverage -s
+```
 
 ## Deployment
 
