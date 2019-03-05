@@ -1,3 +1,9 @@
+#
+# A GitLab CI file to build a docker image on push when the commit is tagged
+# NOTE - Tags aren't pushed by default, you can `git push --tags` each time
+#        or `git config --global push.followTags true`
+#
+
 image: docker:latest
 
 services:
