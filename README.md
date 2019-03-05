@@ -241,3 +241,11 @@ Commands:
   schedule [options] <cron>  Schedule a fetch based on a cron job, https://crontab.guru
   ls                         List projects that are stored in redis
 ```
+
+## Future work
+
+> Coming soon
+
+---
+
+> The code on https://github.com/unplatform/catalyst-trello-scraper is a mirror of https://openlab.ncl.ac.uk/gitlab/catalyst/trello-scraper
