@@ -41,11 +41,13 @@ const {
 // Create our `commander` program and add commands
 //
 
-program.version(process.env.npm_package_version!)
+program
+  .name(process.env.npm_package_name!)
+  .version(process.env.npm_package_version!)
 
 program
   .command('fetch')
-  .description('Fetch the current projects and store them in redis')
+  .description('Fetch the current projects and content and store them in redis')
   .option('--dry-run', 'Only output projects', false)
   .option('--verbose', 'Output additional info', false)
   .action(fetch)
@@ -62,9 +64,14 @@ program
   .action(schedule)
 
 program
-  .command('ls')
+  .command('list-projects')
   .description('List projects that are stored in redis')
   .action(listProjects)
+
+program
+  .command('show-content')
+  .description('Show the content stored in redis')
+  .action(showContent)
 
 // Fail on unknown commands
 program.on('command:*', () => {
@@ -84,24 +91,42 @@ if (process.argv.length < 3) {
 program.parse(process.argv)
 
 //
+// CLI Utils
+//
+
+/** Perform the fetch from trello */
+async function trelloFetch(verbose: boolean, dryRun: boolean) {
+  let startTime = Date.now()
+
+  const board = await trello.fetchBoard(boardId)
+  const projects = trello.fetchProjects(board, listId)
+  const content = trello.fetchContent(board)
+
+  if (verbose) {
+    console.log(
+      new Date().toISOString(),
+      `(${formatMilliseconds(Date.now() - startTime)})`,
+      `Fetched ${projects.length} projects`
+    )
+  }
+
+  if (dryRun) {
+    outputProjects(projects)
+    outputContent(content)
+  } else {
+    await redis.set('projects', pack(projects))
+    await redis.set('content', pack(content))
+  }
+}
+
+//
 // CLI actions
 //
 
 /** Fetch projects and store them in redis */
 async function fetch(cmd: program.Command) {
   try {
-    let startTime = Date.now()
-    const projects = await trello.fetchProjects(boardId, listId)
-
-    if (cmd.dryRun) {
-      outputProjects(projects)
-      return
-    } else {
-      await redis.set('projects', pack(projects))
-    }
-
-    if (cmd.verbose) logFetch(startTime, projects)
-
+    await trelloFetch(cmd.verbose, cmd.dryRun)
     await redis.close()
   } catch (error) {
     console.log(redCross, 'Fetch failed:', error.message)
@@ -128,12 +153,7 @@ async function schedule(schedule: string, cmd: program.Command) {
     schedule,
     async () => {
       try {
-        let startTime = Date.now()
-        const projects = await trello.fetchProjects(boardId, listId)
-
-        if (cmd.verbose) logFetch(startTime, projects)
-
-        await redis.set('projects', pack(projects))
+        await trelloFetch(cmd.verbose, false)
       } catch (error) {
         console.log(redCross, 'Fetch failed:', error.message)
       }
@@ -146,7 +166,6 @@ async function schedule(schedule: string, cmd: program.Command) {
 async function listProjects(cmd: program.Command) {
   try {
     let projects = unpack(await redis.get('projects'))
-
     outputProjects(projects)
 
     await redis.close()
@@ -156,17 +175,22 @@ async function listProjects(cmd: program.Command) {
   }
 }
 
-function logFetch(startTime: number, projects: Project[]) {
-  console.log(
-    new Date().toISOString(),
-    `(${formatMilliseconds(Date.now() - startTime)})`,
-    `Fetched ${projects.length} projects`
-  )
+/** Show the content stored in redis */
+async function showContent(cmd: program.Command) {
+  try {
+    let content = unpack(await redis.get('content'))
+    outputContent(content)
+
+    await redis.close()
+  } catch (error) {
+    console.log(redCross, `List failed: ${error.message}`)
+    process.exit(1)
+  }
 }
 
 /** Output projects in a structured way */
-function outputProjects(projects?: Project[]) {
-  if (!projects || projects.length === 0) {
+function outputProjects(projects: Project[] = []) {
+  if (projects.length === 0) {
     console.log('No projects found')
     return
   }
@@ -175,5 +199,19 @@ function outputProjects(projects?: Project[]) {
 
   for (let i in projects) {
     console.log(`${parseInt(i) + 1}. ${projects[i].name}`)
+  }
+}
+
+/** Output content */
+function outputContent(content: StringObject = {}) {
+  if (Object.keys(content).length === 0) {
+    console.log('No content found')
+    return
+  }
+
+  console.log(`Found content:`)
+
+  for (let key in content) {
+    console.log(`[${key}] = "${content[key]}"\n`)
   }
 }

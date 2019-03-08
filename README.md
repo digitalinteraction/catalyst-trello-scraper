@@ -231,16 +231,17 @@ services:
 Here's the output of the `--help` option for reference
 
 ```
-Usage: cli.ts [options] [command]
+Usage: @openlab/catalyst-trello-scraper [options] [command]
 
 Options:
   -V, --version              output the version number
   -h, --help                 output usage information
 
 Commands:
-  fetch [options]            Fetch the current projects and store them in redis
+  fetch [options]            Fetch the current projects and content and store them in redis
   schedule [options] <cron>  Schedule a fetch based on a cron job, https://crontab.guru
-  ls                         List projects that are stored in redis
+  list-projects              List projects that are stored in redis
+  show-content               Show the content stored in redis
 ```
 
 ## Future work

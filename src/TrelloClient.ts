@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { TrelloBoard, Project, TagRelation } from './types'
+import { TrelloBoard, Project, TagRelation, StringObject } from './types'
 
 export type LabelRelationMap = {
   [idx: string]: TagRelation | undefined
@@ -20,7 +20,7 @@ export class TrelloClient {
   constructor(public appKey: string, public token: string) {}
 
   /** Fetch a trello board with the fields needed to process projects */
-  async fetchBoard(id: string): Promise<TrelloBoard | null> {
+  async fetchBoard(id: string): Promise<TrelloBoard> {
     try {
       const { data } = await this.client.get<TrelloBoard>(`/boards/${id}`, {
         params: {
@@ -32,15 +32,13 @@ export class TrelloClient {
       })
       return data
     } catch (error) {
-      return null
+      console.log(error.message)
+      throw new Error(`Couldn't fetch board ${id}`)
     }
   }
 
   /** Process projects from a board's cards in a specific list */
-  async fetchProjects(boardId: string, publicListId: string) {
-    const board = await this.fetchBoard(boardId)
-    if (!board) return []
-
+  fetchProjects(board: TrelloBoard, publicListId: string) {
     const labels = {} as LabelRelationMap
     const findRelation = /^\s*(.+)\s*:\s*(.+)\s*$/
 
@@ -73,5 +71,20 @@ export class TrelloClient {
     }
 
     return projects
+  }
+
+  /** Process content from a board's cards in a specific list */
+  fetchContent(board: TrelloBoard) {
+    const contentRegex = /^\[(\S+)\]$/
+
+    const content: StringObject = {}
+
+    for (let card of board.cards) {
+      let match = contentRegex.exec(card.name)
+      if (!match) continue
+      content[match[1]] = card.desc
+    }
+
+    return content
   }
 }

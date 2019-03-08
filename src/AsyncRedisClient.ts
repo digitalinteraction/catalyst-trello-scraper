@@ -49,6 +49,6 @@ export class AsyncRedisClient {
   /** Close the redis connection, if there is one */
   async close() {
     if (!this.client) return
-    await this.client.quit()
+    await new Promise(resolve => this.client!.quit(() => resolve()))
   }
 }
