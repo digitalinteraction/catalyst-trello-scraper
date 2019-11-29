@@ -2,40 +2,41 @@ import validateEnv from 'valid-env'
 import program from 'commander'
 import chalk from 'chalk'
 import cron from 'node-cron'
-import { formatMilliseconds } from 'format-ms'
+import debugFn from 'debug'
 
-import { TrelloClient } from './TrelloClient'
-import { AsyncRedisClient } from './AsyncRedisClient'
+import { TrelloClient, TrelloCard, TrelloLabel } from '@openlab/trello-client'
+
 import { redCross } from './consts'
-import { Project, StringObject } from './types'
+import { promisifiedRedis } from './promisified-redis'
+import { pack, unpack, logItems, logContent, extractContent } from './utils'
+
+const debug = debugFn('trello-scraper:cli')
 
 // Ensure required variables are set or exit(1)
 validateEnv([
   'TRELLO_APP_KEY',
   'TRELLO_TOKEN',
   'TRELLO_BOARD_ID',
-  'TRELLO_LIST_ID',
+  'TRELLO_TARGET_LIST_ID',
   'REDIS_URL'
 ])
 
-// Create a client to talk to trello
-const trello = new TrelloClient(
-  process.env.TRELLO_APP_KEY!,
-  process.env.TRELLO_TOKEN!
-)
-
-// Create a connection to redis
-const redis = new AsyncRedisClient(process.env.REDIS_URL!)
-
-// Utilities to pack/unpack for redis (could change implementation later?)
-const pack = (data: any) => JSON.stringify(data)
-const unpack = (data: any) => JSON.parse(data)
-
 // Destructure environment variables to give them types
 const {
-  TRELLO_BOARD_ID: boardId,
-  TRELLO_LIST_ID: listId
-} = process.env as StringObject
+  TRELLO_BOARD_ID,
+  TRELLO_TARGET_LIST_ID,
+  TRELLO_APP_KEY,
+  TRELLO_TOKEN,
+  REDIS_URL
+} = process.env as Record<string, string>
+
+const { TRELLO_CONTENT_LIST_ID } = process.env
+
+// Create a client to talk to trello
+const trello = new TrelloClient(TRELLO_APP_KEY, TRELLO_TOKEN)
+
+// Create a connection to redis
+const redis = promisifiedRedis(REDIS_URL)
 
 //
 // Create our `commander` program and add commands
@@ -64,12 +65,17 @@ program
   .action(schedule)
 
 program
-  .command('list-projects')
-  .description('List projects that are stored in redis')
-  .action(listProjects)
+  .command('show:labels')
+  .description('Show the trello labels in redis')
+  .action(showLabels)
 
 program
-  .command('show-content')
+  .command('show:cards')
+  .description('Show the matched trello cards in redis')
+  .action(showCards)
+
+program
+  .command('show:content')
   .description('Show the content stored in redis')
   .action(showContent)
 
@@ -83,7 +89,7 @@ program.on('command:*', () => {
 // -> The first 2 args are the command and file
 if (process.argv.length < 3) {
   program.outputHelp()
-  redis.close()
+  redis.quit()
   process.exit(1)
 }
 
@@ -96,25 +102,32 @@ program.parse(process.argv)
 
 /** Perform the fetch from trello */
 async function trelloFetch(verbose: boolean, dryRun: boolean) {
-  let startTime = Date.now()
+  debug(
+    `#trelloFetch targetId=${TRELLO_TARGET_LIST_ID} contentId=${TRELLO_CONTENT_LIST_ID}`
+  )
 
-  const board = await trello.fetchBoard(boardId)
-  const projects = trello.fetchProjects(board, listId)
-  const content = trello.fetchContent(board)
+  const labels = await trello.fetchLabels(TRELLO_BOARD_ID)
+  const lists = await trello.fetchLists(TRELLO_BOARD_ID)
 
-  if (verbose) {
-    console.log(
-      new Date().toISOString(),
-      `(${formatMilliseconds(Date.now() - startTime)})`,
-      `Fetched ${projects.length} projects`
-    )
-  }
+  debug(`#trelloFetch labels=${labels.length} lists=${lists.length}`)
+
+  const targetLists = lists.filter(l => l.id === TRELLO_TARGET_LIST_ID)
+  const contentLists = lists.filter(l => l.id === TRELLO_CONTENT_LIST_ID)
+
+  const cards = targetLists.reduce(
+    (a, l) => a.concat(l.cards),
+    [] as TrelloCard[]
+  )
+  const content = extractContent(contentLists)
+
+  debug(`#trelloFetch cards=${cards.length}`)
 
   if (dryRun) {
-    outputProjects(projects)
-    outputContent(content)
+    logItems(cards, 'card', p => `${chalk.green(p.id)} ${p.name}`)
+    logContent(content)
   } else {
-    await redis.set('projects', pack(projects))
+    await redis.set('labels', pack(labels))
+    await redis.set('cards', pack(cards))
     await redis.set('content', pack(content))
   }
 }
@@ -127,7 +140,7 @@ async function trelloFetch(verbose: boolean, dryRun: boolean) {
 async function fetch(cmd: program.Command) {
   try {
     await trelloFetch(cmd.verbose, cmd.dryRun)
-    await redis.close()
+    await redis.quit()
   } catch (error) {
     console.log(redCross, 'Fetch failed:', error.message)
     process.exit(1)
@@ -149,6 +162,7 @@ async function schedule(schedule: string, cmd: program.Command) {
 
   console.log(`Scheduled for '${schedule}' in ${timezone}`)
   console.log('see:', url)
+
   cron.schedule(
     schedule,
     async () => {
@@ -163,14 +177,20 @@ async function schedule(schedule: string, cmd: program.Command) {
 }
 
 /** List projects stored in redis */
-async function listProjects(cmd: program.Command) {
+async function showLabels(cmd: program.Command) {
   try {
-    let projects = unpack(await redis.get('projects'))
-    outputProjects(projects)
+    let labels: TrelloLabel[] = unpack(await redis.get('labels'))
+    if (!labels) return console.log('No labels found')
 
-    await redis.close()
+    logItems<TrelloLabel>(labels, 'label', l => [
+      chalk.green(l.id),
+      l.name || 'no_name',
+      chalk.grey(l.color || 'hidden')
+    ])
+
+    await redis.quit()
   } catch (error) {
-    console.log(redCross, `List failed: ${error.message}`)
+    console.log(redCross, error.message)
     process.exit(1)
   }
 }
@@ -178,40 +198,27 @@ async function listProjects(cmd: program.Command) {
 /** Show the content stored in redis */
 async function showContent(cmd: program.Command) {
   try {
-    let content = unpack(await redis.get('content'))
-    outputContent(content)
+    let content: Record<string, string> = unpack(await redis.get('content'))
+    if (!content) return console.log('No content found')
 
-    await redis.close()
+    logContent(content)
+
+    await redis.quit()
   } catch (error) {
-    console.log(redCross, `List failed: ${error.message}`)
+    console.log(redCross, error.message)
     process.exit(1)
   }
 }
 
-/** Output projects in a structured way */
-function outputProjects(projects: Project[] = []) {
-  if (projects.length === 0) {
-    console.log('No projects found')
-    return
-  }
+async function showCards(cmd: program.Command) {
+  try {
+    let cards: TrelloCard[] = unpack(await redis.get('cards'))
 
-  console.log(`Found ${projects.length} projects`)
+    logItems(cards, 'card', c => [chalk.green(c.id), c.name])
 
-  for (let i in projects) {
-    console.log(`${parseInt(i) + 1}. ${projects[i].name}`)
-  }
-}
-
-/** Output content */
-function outputContent(content: StringObject = {}) {
-  if (Object.keys(content).length === 0) {
-    console.log('No content found')
-    return
-  }
-
-  console.log(`Found content:`)
-
-  for (let key in content) {
-    console.log(`[${key}] = "${content[key]}"\n`)
+    await redis.quit()
+  } catch (error) {
+    console.log(redCross, error.message)
+    process.exit(1)
   }
 }

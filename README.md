@@ -11,18 +11,23 @@ parses relationships from card labels, then writes into [redis](https://redis.io
 
 <!-- toc-head -->
 
-## Table of Contents
+## Table of contents
 
+- [Table of Contents](#table-of-contents)
 - [Why a CLI](#why-a-cli)
+- [Using the image](#using-the-image)
+  - [Envionment variables](#envionment-variables)
+  - [Command](#command)
 - [Development](#development)
   - [Setup](#setup)
   - [Regular use](#regular-use)
   - [Irregular use](#irregular-use)
   - [Code Structure](#code-structure)
   - [Code formatting](#code-formatting)
+  - [Testing](#testing)
 - [Deployment](#deployment)
   - [Building the image](#building-the-image)
-  - [Using the image](#using-the-image)
+- [Future work](#future-work)
 
 <!-- toc-tail -->
 
@@ -34,6 +39,40 @@ This means you can set environment variables and link in a redis container.
 It uses Docker's `ENTRYPOINT` so that you can pass your CLI command via docker.
 This means you can deploy and run through `docker-compose` and customise the command
 at the deployment level, not at the application level.
+
+## Using the image
+
+### Envionment variables
+
+Theses are the envionment variables to set inside the docker container.
+See [Setup](#setup) for more info about generating these.
+
+- `TRELLO_APP_KEY` - Your trello app key, from https://trello.com/app-key
+- `TRELLO_TOKEN` - Your generated app token
+- `TRELLO_BOARD_ID` - The board id to scrape from
+- `TRELLO_TARGET_LIST_ID` - The list id to pull cards from
+- `TRELLO_CONTENT_LIST_ID` - The list if to pull content cards from (optional)
+- `REDIS_URL` - The url to access redis from
+
+### Command
+
+Set the container's command to what you want it to perform,
+here is the output of the `--help` option for reference.
+
+```
+Usage: @openlab/catalyst-trello-scraper [options] [command]
+
+Options:
+  -V, --version              output the version number
+  -h, --help                 output usage information
+
+Commands:
+  fetch [options]            Fetch the current projects and content and store them in redis
+  schedule [options] <cron>  Schedule a fetch based on a cron job, https://crontab.guru
+  show:labels                Show the trello labels in redis
+  show:cards                 Show the matched trello cards in redis
+  show:content               Show the content stored in redis
+```
 
 ## Development
 
@@ -50,6 +89,12 @@ You'll only need to follow this setup once for your dev machine.
 # Install dependancies
 npm install
 
+# Start up a redis container
+# -> Launches a redis:4-alpine docker container
+# -> Remember to 'docker-compose stop' after developing
+# -> Binds port 6379 to localhost:6379
+docker-compose up -d
+
 # Setup your environment
 cp .env.example .env
 
@@ -57,8 +102,8 @@ cp .env.example .env
 open https://trello.com/app-key
 
 # Generate a Trello token for development, then fill it into your .env
-. .env
-open "https://trello.com/1/authorize?expiration=never&scope=read&response_type=token&name=Husky%20CMS&key=$TRELLO_APP_KEY"
+source .env
+open "https://trello.com/1/authorize?expiration=never&scope=read&response_type=token&name=Not-Equal%20Catalyst&key=$TRELLO_APP_KEY"
 
 # To get your TRELLO_BOARD_ID & TRELLO_LIST_ID, visit the board you want to pull from on the trello.com
 # Then add .json to the end of the url and inspect the contents to find your values
@@ -70,12 +115,6 @@ open https://trello.com
 These are the commands you'll regularly run to develop the CLI, in no particular order.
 
 ```bash
-# Spin up a local redis instance for development
-# -> Launches a redis:4-alpine docker container (you'll need docker running)
-# -> Binds port 6379 to localhost:6379
-# -> Names the container dev_redis
-npm run redis
-
 # Run the CLI in development mode
 # -> Runs the TypeScript directly with `ts-node` and loads the .env
 # -> Use the `--` to stop npm swallowing the dash-dash arguments
@@ -90,7 +129,9 @@ npm run redis-cli
 
 # Useful redis commands
 127.0.0.1:6379> keys *       # List all keys
-127.0.0.1:6379> get projects # Get projects
+127.0.0.1:6379> get cards    # Get cards
+127.0.0.1:6379> get labels   # Get labels
+127.0.0.1:6379> get content  # Get content
 
 # Run unit tests
 # -> Looks for files named `*.spec.ts` in the src directory
@@ -184,69 +225,9 @@ git push --tags
 open https://openlab.ncl.ac.uk/gitlab/catalyst/trello-scraper/-/jobs
 ```
 
-### Using the image
-
-With this docker image you can easily deploy and run the CLI using docker-compose.
-You'll need to set your environment variables, similar to [Regular use](#regular-use).
-
-Here is an example `docker-compose.yml`:
-
-> Notes:
->
-> - You pass the same commands as `npm run dev` to the `command` attribute
-> - You can set non-secret environment variables with the `environment` option.
-> - Don't actually run this docker-compose.yml, it's an example
-> - For more info see [catalyst-example-stack](https://github/com/unplatform/catalyst-example-stack)
-
-```yml
-version: '3'
-
-services:
-  # A data store for projects, lightweight and stored in memory
-  redis:
-    image: redis:4-alpine
-    restart: unless-stopped
-
-  # Just run the scraper once and dump content to redis
-  one-time-scraper:
-    image: openlab.ncl.ac.uk:4567/catalyst/trello-scraper:0.3.0
-    env_file: .env
-    environment:
-      REDIS_URL: redis://redis
-      TRELLO_BOARD_ID: 5c5aed4d6f28188f43ba86d4
-      TRELLO_LIST_ID: 5c5aee796eb6b98ee9e5a684
-    command: fetch --verbose
-
-  # Run the scraper every 2 minutes, dumping content to redis
-  scheduled-scraper:
-    image: openlab.ncl.ac.uk:4567/catalyst/trello-scraper:0.3.0
-    env_file: .env
-    environment:
-      REDIS_URL: redis://redis
-      TRELLO_BOARD_ID: 5c5aed4d6f28188f43ba86d4
-      TRELLO_LIST_ID: 5c5aee796eb6b98ee9e5a684
-    command: schedule "*/2 * * * *" --verbose
-```
-
-Here's the output of the `--help` option for reference
-
-```
-Usage: @openlab/catalyst-trello-scraper [options] [command]
-
-Options:
-  -V, --version              output the version number
-  -h, --help                 output usage information
-
-Commands:
-  fetch [options]            Fetch the current projects and content and store them in redis
-  schedule [options] <cron>  Schedule a fetch based on a cron job, https://crontab.guru
-  list-projects              List projects that are stored in redis
-  show-content               Show the content stored in redis
-```
-
 ## Future work
 
-> Coming soon
+- Add automated testing
 
 ---
 

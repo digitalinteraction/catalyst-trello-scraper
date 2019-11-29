@@ -1,22 +1,19 @@
-# [0] A common base for any stage
-FROM node:10-alpine as base
+# [0] A common base for both stages
+FROM node:12-alpine as base
 WORKDIR /app
 COPY ["package*.json", "tsconfig.json", "/app/"]
 
-# [1] A builder to install all dependancies and run the build
+# [1] A builder to install modules and run a build
 FROM base as builder
 ENV NODE_ENV development
 RUN npm ci &> /dev/null
-COPY ["src", "/app/src"]
-RUN npm run build -s
+COPY src /app/src
+RUN npm run build -s &> /dev/null
 
-# [2] Run tests
-FROM builder as tester
-ENV NODE_ENV test
-RUN npm test -s
-
-# [3] From the base, copy generated files and prune to production dependancies
-FROM builder as prod
+# [2] From the base again, install production deps and copy compilled code
+FROM base as dist
+EXPOSE 3000
 ENV NODE_ENV production
-RUN npm prune
+RUN npm ci &> /dev/null
+COPY --from=builder /app/dist /app/dist
 ENTRYPOINT ["npm", "start", "-s", "--"]
