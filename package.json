@@ -30,7 +30,7 @@
     "node": ">=8"
   },
   "dependencies": {
-    "@openlab/trello-client": "^0.1.0",
+    "@openlab/trello-client": "^0.1.1",
     "axios": "^0.18.1",
     "chalk": "^2.4.2",
     "commander": "^2.19.0",
