@@ -13,15 +13,15 @@ parses relationships from card labels, then writes into [redis](https://redis.io
 
 ## Table of contents
 
-- [Table of Contents](#table-of-contents)
 - [Why a CLI](#why-a-cli)
-- [Using the image](#using-the-image)
-  - [Envionment variables](#envionment-variables)
-  - [Command](#command)
+- [Usage](#usage)
+  - [Environment variables](#environment-variables)
+  - [Commands](#commands)
 - [Development](#development)
   - [Setup](#setup)
   - [Regular use](#regular-use)
   - [Irregular use](#irregular-use)
+  - [Commits](#commits)
   - [Code Structure](#code-structure)
   - [Code formatting](#code-formatting)
   - [Testing](#testing)
@@ -40,9 +40,11 @@ It uses Docker's `ENTRYPOINT` so that you can pass your CLI command via docker.
 This means you can deploy and run through `docker-compose` and customise the command
 at the deployment level, not at the application level.
 
-## Using the image
+## Usage
 
-### Envionment variables
+This repo has a Docker image for each version of the scraper.
+
+### Environment variables
 
 Theses are the envionment variables to set inside the docker container.
 See [Setup](#setup) for more info about generating these.
@@ -54,7 +56,7 @@ See [Setup](#setup) for more info about generating these.
 - `TRELLO_CONTENT_LIST_ID` - The list if to pull content cards from (optional)
 - `REDIS_URL` - The url to access redis from
 
-### Command
+### Commands
 
 Set the container's command to what you want it to perform,
 here is the output of the `--help` option for reference.
@@ -80,7 +82,7 @@ Commands:
 
 To develop on this repo you will need to have [Docker](https://www.docker.com/) and
 [node.js](https://nodejs.org) installed on your dev machine and have an understanding of them.
-This guide assumes you have the repo checked out and are on macOS, but equivalent commands are available.
+This guide assumes you have the repo checked out and are on macOS.
 You will also need a Trello account which is used to pull the data from.
 
 You'll only need to follow this setup once for your dev machine.
@@ -164,6 +166,13 @@ npm run build
 npm run start
 ```
 
+### Commits
+
+All commits to this repo must follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+This ensures changes are structured and means the [CHANGELOG.md](/CHANGELOG.md) can be automatically generated.
+
+This standard is enforced through a `commit-msg` hook using [yorkie](https://www.npmjs.com/package/yorkie).
+
 ### Code Structure
 
 | Folder       | Contents                                     |
@@ -219,15 +228,21 @@ It pushes these docker images to the [GitLab registry](https://openlab.ncl.ac.uk
 A slight nuance is that it will replace a preceding `v` in tag names, formatting `v1.0.0` to `1.0.0`.
 
 ```bash
-# Deploy a new version of the CLI
-npm version # major | minor | patch
-git push --tags
-open https://openlab.ncl.ac.uk/gitlab/catalyst/trello-scraper/-/jobs
+# Generate a new release
+# -> Generates a new version based on the commits since the last version
+# -> Generates the CHANGELOG.md based on those commits
+# -> There is a "preversion" script to lint & run tests
+npm run release
+
+# Push the new version
+# -> The GitLab CI will build a new docker image for it
+git push --follow-tags
 ```
 
 ## Future work
 
 - Add automated testing
+- Push docker images to dockerhub
 
 ---
 
