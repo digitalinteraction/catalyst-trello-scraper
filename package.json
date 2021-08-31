@@ -4,7 +4,7 @@
   "version": "1.0.2",
   "description": "Scrapes a Trello list, parses label-relationships and stores into redis",
   "types": "dist/index.d.ts",
-  "repository": "unplatform/catalyst-trello-scraper",
+  "repository": "digitalinteraction/catalyst-trello-scraper",
   "author": "Rob Anderson (https://r0b.io)",
   "license": "MIT",
   "scripts": {
