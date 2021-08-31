@@ -242,8 +242,3 @@ git push --follow-tags
 ## Future work
 
 - Add automated testing
-- Push docker images to dockerhub
-
----
-
-> The code on https://github.com/unplatform/catalyst-trello-scraper is a mirror of https://openlab.ncl.ac.uk/gitlab/catalyst/trello-scraper
